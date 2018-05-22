@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/FacialLogin.iml" filepath="$PROJECT_DIR$/FacialLogin.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
-      <module fileurl="file://$PROJECT_DIR$/faciallogin.iml" filepath="$PROJECT_DIR$/faciallogin.iml" />
     </modules>
   </component>
 </project>
