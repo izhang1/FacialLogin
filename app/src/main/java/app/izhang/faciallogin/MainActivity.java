@@ -16,6 +16,8 @@ import android.webkit.URLUtil;
 import android.widget.Button;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.URI;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -71,10 +73,29 @@ public class MainActivity extends AppCompatActivity {
         logBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-
+                startCameraIntent();
             }
         });
 
+    }
+
+    private void startCameraIntent(){
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        intent.putExtra("android.intent.extras.CAMERA_FACING", 1);
+
+        File outPutFile = new File(Environment.getDataDirectory().getAbsolutePath());
+        if (!outPutFile.exists()) {
+            outPutFile.mkdirs();
+        }
+
+        Uri capturedImageUri = null;
+        try {
+            capturedImageUri = Uri.fromFile(File.createTempFile("packagename" + System.currentTimeMillis(), ".jpg", outPutFile));
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, capturedImageUri);
+            startActivityForResult(intent, CAMERA_PHOTO_REQUEST_CODE);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -85,14 +106,8 @@ public class MainActivity extends AppCompatActivity {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                         && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-                        intent.putExtra("android.intent.extras.CAMERA_FACING", android.hardware.Camera.CameraInfo.CAMERA_FACING_FRONT);
-                        intent.putExtra("android.intent.extras.LENS_FACING_FRONT", 1);
-                        intent.putExtra("android.intent.extra.USE_FRONT_CAMERA", true);
-                    } else {
-                        intent.putExtra("android.intent.extras.CAMERA_FACING", 1);
-                    }
+                    startCameraIntent();
+
                 } else {
                     // permission denied, boo! Disable the
                     // functionality that depends on this permission.
@@ -102,6 +117,13 @@ public class MainActivity extends AppCompatActivity {
 
             // other 'case' lines to check for other
             // permissions this app might request.
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if(requestCode == CAMERA_PERMISSION_REQUEST && resultCode == RESULT_OK) {
+            // Getting the data back
         }
     }
 }
