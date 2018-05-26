@@ -3,6 +3,7 @@ package app.izhang.faciallogin;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -15,6 +16,7 @@ import android.util.Log;
 import android.view.View;
 import android.webkit.URLUtil;
 import android.widget.Button;
+import android.widget.ImageView;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,6 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private static int CAMERA_PHOTO_REQUEST_CODE = 1111;
     private final int CAMERA_PERMISSION_REQUEST = 1;
 
+    private ImageView tempImageView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
 
         Button regbtn = this.findViewById(R.id.btn_reg);
         Button logBtn = this.findViewById(R.id.btn_login);
+        tempImageView = this.findViewById(R.id.imageView);
 
         // Check for permissions
 
@@ -65,9 +69,7 @@ public class MainActivity extends AppCompatActivity {
         regbtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                intent.putExtra("android.intent.extras.CAMERA_FACING", 1);
-                startActivity(intent);
+                startCameraIntent();
             }
         });
 
@@ -81,22 +83,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startCameraIntent(){
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        intent.putExtra("android.intent.extras.CAMERA_FACING", 1);
+        Intent launchCameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        launchCameraIntent.putExtra("android.intent.extras.CAMERA_FACING", 1);
 
-        File outPutFile = new File(Environment.getDataDirectory().getAbsolutePath());
-        if (!outPutFile.exists()) {
-            outPutFile.mkdirs();
+        // Checks to see if the phone has a camera app/hardware
+        if(launchCameraIntent.resolveActivity(getPackageManager()) != null) {
+            startActivityForResult(launchCameraIntent, CAMERA_PHOTO_REQUEST_CODE);
         }
 
-        Uri capturedImageUri = null;
-        try {
-            capturedImageUri = Uri.fromFile(File.createTempFile("packagename" + System.currentTimeMillis(), ".jpg", outPutFile));
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, capturedImageUri);
-            startActivityForResult(intent, CAMERA_PHOTO_REQUEST_CODE);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     @Override
@@ -123,9 +117,11 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if(requestCode == CAMERA_PERMISSION_REQUEST && resultCode == RESULT_OK) {
+        if(requestCode == CAMERA_PHOTO_REQUEST_CODE && resultCode == RESULT_OK) {
             // Getting the data back
-            Log.v("onActivityResult","Permissions and Request worked");
+            Bundle extras = data.getExtras();
+            Bitmap imageBitmap = (Bitmap) extras.get("data");
+            tempImageView.setImageBitmap(imageBitmap);
         }
     }
 }
