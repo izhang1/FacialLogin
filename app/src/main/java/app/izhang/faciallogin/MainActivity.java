@@ -48,51 +48,39 @@ public class MainActivity extends AppCompatActivity {
         Button logBtn = this.findViewById(R.id.btn_login);
         tempImageView = this.findViewById(R.id.imageView);
 
-        // Check for permissions
-
-        // Here, thisActivity is the current activity
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            // Permission is not granted
-            // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.CAMERA)) {
-                // Show an explanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-            } else {
-                // No explanation needed; request the permission
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.CAMERA},
-                        CAMERA_PERMISSION_REQUEST);
-
-                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
-                // app-defined int constant. The callback method gets the
-                // result of the request.
-            }
-        } else {
-            // Permission has already been granted
-        }
 
         regbtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                startCameraIntent();
+                checkAndRequestPermissions();
             }
         });
 
         logBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                startCameraIntent();
-            }
+                checkAndRequestPermissions();            }
         });
 
     }
 
-    private void startCameraIntent(){
+    private void checkAndRequestPermissions(){
+        // Check for permissions
+        // Checking if external storage permissions is available
+        if(ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(this,
+                Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED){
+
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA},
+                    CAMERA_PERMISSION_REQUEST);
+        }else{
+            startCameraIntentForRegister();
+        }
+
+    }
+
+    private void startCameraIntentForRegister(){
         Intent launchCameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         savedImagedPath = Environment.getExternalStorageDirectory();
         savedImagedPath = new File(savedImagedPath, FileManager.BASE_IMG_REF);
