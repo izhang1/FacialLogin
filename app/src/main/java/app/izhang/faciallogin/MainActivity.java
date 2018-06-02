@@ -47,7 +47,7 @@ public class MainActivity extends AppCompatActivity {
     private File savedImageFile;
     private File compareImageFile;
 
-    private FaceServiceClient faceServiceClient = new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "<subscription>");
+    private FaceServiceClient faceServiceClient = new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "<>");
 
 
     @Override
@@ -148,7 +148,7 @@ public class MainActivity extends AppCompatActivity {
             }
             @Override
             protected void onPostExecute(Face[] result) {
-                if(result == null) {
+                if(result == null || result.length == 0) {
                     Toast.makeText(getApplicationContext(), "Face was not detected, please try again", Toast.LENGTH_LONG).show();
                     savedImageFile.delete();
                     return;
