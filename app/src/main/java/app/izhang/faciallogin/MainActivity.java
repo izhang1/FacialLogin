@@ -1,6 +1,7 @@
 package app.izhang.faciallogin;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -9,6 +10,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.ExifInterface;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -24,6 +26,12 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.microsoft.projectoxford.face.FaceServiceClient;
+import com.microsoft.projectoxford.face.FaceServiceRestClient;
+import com.microsoft.projectoxford.face.contract.Face;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,10 +43,12 @@ public class MainActivity extends AppCompatActivity {
     private static int CAMERA_PHOTO_VERIFY_REQUEST = 1001;
     private final int CAMERA_PERMISSION_REQUEST = 1;
 
-
     private ImageView tempImageView;
     private File savedImageFile;
     private File compareImageFile;
+
+    private FaceServiceClient faceServiceClient = new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "<subscription>");
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,21 +73,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        savedImageFile = new File(getApplicationContext().getFilesDir(), FileManager.BASE_IMG_REF);
-        if(savedImageFile.exists()){
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-            Bitmap bitmap = null;
-            try {
-                bitmap = handleSamplingAndRotationBitmap(this, Uri.fromFile(savedImageFile.getAbsoluteFile()));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            if(bitmap != null) tempImageView.setImageBitmap(bitmap);
-        }
-
-
+        setBaseImage();
     }
 
     private void checkAndRequestPermissions(){
@@ -93,11 +89,82 @@ public class MainActivity extends AppCompatActivity {
         }else{
             startCameraIntentForRegister();
         }
+    }
 
+    private void setBaseImage(){
+        savedImageFile = new File(getApplicationContext().getFilesDir(), FileManager.BASE_IMG_REF);
+        if(savedImageFile.exists()){
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap bitmap = null;
+            try {
+                bitmap = handleSamplingAndRotationBitmap(this, Uri.fromFile(savedImageFile.getAbsoluteFile()));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if(bitmap != null) tempImageView.setImageBitmap(bitmap);
+        }
+    }
+
+    @SuppressLint("StaticFieldLeak")
+    private void detectImage(final Bitmap imageBitmap)
+    {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+        ByteArrayInputStream inputStream =
+                new ByteArrayInputStream(outputStream.toByteArray());
+        AsyncTask<InputStream, String, Face[]> detectTask;
+        detectTask = new AsyncTask<InputStream, String, Face[]>() {
+            @Override
+            protected Face[] doInBackground(InputStream... params) {
+                try {
+                    Face[] result = faceServiceClient.detect(
+                            params[0],
+                            true,         // returnFaceId
+                            false,        // returnFaceLandmarks
+                            null           // returnFaceAttributes: a string like "age, gender"
+                    );
+
+                    if (result == null)
+                    {
+                        Log.v("doInBackground", "Detection Finished. Nothing detected");
+                        return null;
+                    }
+
+                    return result;
+
+                } catch (Exception e) {
+                    Log.v("doInBackground", "Exception: " + e.getMessage());
+
+                    return null;
+                }
+            }
+            @Override
+            protected void onPreExecute() {
+            }
+            @Override
+            protected void onProgressUpdate(String... progress) {
+            }
+            @Override
+            protected void onPostExecute(Face[] result) {
+                if(result == null) {
+                    Toast.makeText(getApplicationContext(), "Face was not detected, please try again", Toast.LENGTH_LONG).show();
+                    savedImageFile.delete();
+                    return;
+                }else{
+                    // Face was detected, allow this
+                    Toast.makeText(getApplicationContext(), "Face was detected", Toast.LENGTH_LONG).show();
+                    setBaseImage();
+                }
+
+            }
+        };
+
+        detectTask.execute(inputStream);
     }
 
     private void verifyImages(){
-
         savedImageFile = new File(getApplicationContext().getFilesDir(), FileManager.BASE_IMG_REF);
         if(!savedImageFile.exists()){
             Toast.makeText(getApplicationContext(), "Please register an image first", Toast.LENGTH_LONG).show();
@@ -154,8 +221,6 @@ public class MainActivity extends AppCompatActivity {
                 }
                 return;
             }
-
-
             // other 'case' lines to check for other
             // permissions this app might request.
         }
@@ -164,6 +229,19 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if(requestCode == CAMERA_PHOTO_REQUEST_CODE && resultCode == RESULT_OK) {
+            savedImageFile = new File(getApplicationContext().getFilesDir(), FileManager.BASE_IMG_REF);
+            if(savedImageFile.exists()) {
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                Bitmap bitmap = null;
+                try {
+                    bitmap = handleSamplingAndRotationBitmap(this, Uri.fromFile(savedImageFile.getAbsoluteFile()));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                if(bitmap != null) detectImage(bitmap);
+            }
             Toast.makeText(getApplicationContext(), "Successfully saved image", Toast.LENGTH_LONG).show();
         }else if(requestCode == CAMERA_PHOTO_VERIFY_REQUEST && resultCode == RESULT_OK){
             Toast.makeText(getApplicationContext(), "Successfully verified image ", Toast.LENGTH_LONG).show();
