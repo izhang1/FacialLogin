@@ -5,6 +5,7 @@ public class FaceService {
      * isValidFace() Detects whether there's a face and only one face in the picture
      */
     public void isValidFace(){
+        
     }
 
     /**

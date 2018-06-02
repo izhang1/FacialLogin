@@ -32,12 +32,13 @@ import java.net.URI;
 public class MainActivity extends AppCompatActivity {
 
     private static int CAMERA_PHOTO_REQUEST_CODE = 1111;
+    private static int CAMERA_PHOTO_VERIFY_REQUEST = 1001;
     private final int CAMERA_PERMISSION_REQUEST = 1;
-    private final int STORAGE_PERMISSIONS_REQUEST = 2;
 
 
     private ImageView tempImageView;
-    private File savedImagedPath;
+    private File savedImageFile;
+    private File compareImageFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,7 +48,6 @@ public class MainActivity extends AppCompatActivity {
         Button regbtn = this.findViewById(R.id.btn_reg);
         Button logBtn = this.findViewById(R.id.btn_login);
         tempImageView = this.findViewById(R.id.imageView);
-
 
         regbtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -59,8 +59,24 @@ public class MainActivity extends AppCompatActivity {
         logBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                checkAndRequestPermissions();            }
+                verifyImages();
+            }
         });
+
+        savedImageFile = new File(getApplicationContext().getFilesDir(), FileManager.BASE_IMG_REF);
+        if(savedImageFile.exists()){
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap bitmap = null;
+            try {
+                bitmap = handleSamplingAndRotationBitmap(this, Uri.fromFile(savedImageFile.getAbsoluteFile()));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            if(bitmap != null) tempImageView.setImageBitmap(bitmap);
+        }
+
 
     }
 
@@ -80,17 +96,40 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    private void verifyImages(){
+
+        savedImageFile = new File(getApplicationContext().getFilesDir(), FileManager.BASE_IMG_REF);
+        if(!savedImageFile.exists()){
+            Toast.makeText(getApplicationContext(), "Please register an image first", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Intent launchCameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        compareImageFile = new File(getApplicationContext().getFilesDir(), FileManager.COMPARE_IMG_REF);
+
+        launchCameraIntent.putExtra(MediaStore.EXTRA_OUTPUT,
+                FileProvider.getUriForFile(
+                        this,
+                        "app.izhang.faciallogin.fileprovider",
+                        savedImageFile)
+        );
+
+        // Checks to see if the phone has a camera app/hardware
+        if(launchCameraIntent.resolveActivity(getPackageManager()) != null) {
+            startActivityForResult(launchCameraIntent, CAMERA_PHOTO_VERIFY_REQUEST);
+        }
+    }
+
     private void startCameraIntentForRegister(){
         Intent launchCameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        savedImagedPath = Environment.getExternalStorageDirectory();
-        savedImagedPath = new File(savedImagedPath, FileManager.BASE_IMG_REF);
+        savedImageFile = new File(getApplicationContext().getFilesDir(), FileManager.BASE_IMG_REF);
 
         Log.v("MainActivity", this.getApplicationContext().getPackageName());
         launchCameraIntent.putExtra(MediaStore.EXTRA_OUTPUT,
                 FileProvider.getUriForFile(
                         this,
                         "app.izhang.faciallogin.fileprovider",
-                        savedImagedPath)
+                        savedImageFile)
         );
 
         // Checks to see if the phone has a camera app/hardware
@@ -111,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
                     startCameraIntentForRegister();
 
                 } else {
-                    Toast.makeText(this,"Please accept the permissions to continue", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Please accept the permissions to continue", Toast.LENGTH_LONG).show();
                 }
                 return;
             }
@@ -125,17 +164,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if(requestCode == CAMERA_PHOTO_REQUEST_CODE && resultCode == RESULT_OK) {
-            // Getting the data back
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
-            Bitmap bitmap = null;
-            try {
-                bitmap = handleSamplingAndRotationBitmap(this, Uri.fromFile(savedImagedPath.getAbsoluteFile()));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            if(bitmap != null) tempImageView.setImageBitmap(bitmap);
+            Toast.makeText(getApplicationContext(), "Successfully saved image", Toast.LENGTH_LONG).show();
+        }else if(requestCode == CAMERA_PHOTO_VERIFY_REQUEST && resultCode == RESULT_OK){
+            Toast.makeText(getApplicationContext(), "Successfully verified image ", Toast.LENGTH_LONG).show();
         }
     }
 
