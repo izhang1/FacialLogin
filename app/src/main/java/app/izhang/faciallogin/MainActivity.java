@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -29,6 +30,7 @@ import android.widget.Toast;
 import com.microsoft.projectoxford.face.FaceServiceClient;
 import com.microsoft.projectoxford.face.FaceServiceRestClient;
 import com.microsoft.projectoxford.face.contract.Face;
+import com.microsoft.projectoxford.face.contract.VerifyResult;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -36,6 +38,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -47,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
     private File savedImageFile;
     private File compareImageFile;
 
-    private FaceServiceClient faceServiceClient = new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "<>");
+    private FaceServiceClient faceServiceClient = new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "30aaa6ed3f904c2b9c6df2a541d3ce3e");
 
 
     @Override
@@ -72,6 +75,10 @@ public class MainActivity extends AppCompatActivity {
                 verifyImages();
             }
         });
+
+        // Getting the Face ID from Shared Preference
+        SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
+        Log.v("onCreate", "UUID:" + sharedPref.getString(FileManager.BASE_IMG_REF, null));
 
         setBaseImage();
     }
@@ -155,6 +162,12 @@ public class MainActivity extends AppCompatActivity {
                 }else{
                     // Face was detected, allow this
                     Toast.makeText(getApplicationContext(), "Face was detected", Toast.LENGTH_LONG).show();
+                    // Saving the Face ID
+                    SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putString(FileManager.BASE_IMG_REF, result[0].faceId.toString());
+                    editor.commit();
+                    Log.v("onPostExecute", "UUID of base image was saved - UUID: " + result[0].faceId.toString());
                     setBaseImage();
                 }
 
@@ -162,6 +175,112 @@ public class MainActivity extends AppCompatActivity {
         };
 
         detectTask.execute(inputStream);
+    }
+
+    @SuppressLint("StaticFieldLeak")
+    private void detectAndVerifyImage(final Bitmap imageBitmap){
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+        ByteArrayInputStream inputStream =
+                new ByteArrayInputStream(outputStream.toByteArray());
+        AsyncTask<InputStream, String, Face[]> detectTask;
+        detectTask = new AsyncTask<InputStream, String, Face[]>() {
+            @Override
+            protected Face[] doInBackground(InputStream... params) {
+                try {
+                    Face[] result = faceServiceClient.detect(
+                            params[0],
+                            true,         // returnFaceId
+                            false,        // returnFaceLandmarks
+                            null           // returnFaceAttributes: a string like "age, gender"
+                    );
+
+                    if (result == null)
+                    {
+                        Log.v("doInBackground", "Detection Finished. Nothing detected");
+                        return null;
+                    }
+
+                    return result;
+
+                } catch (Exception e) {
+                    Log.v("doInBackground", "Exception: " + e.getMessage());
+
+                    return null;
+                }
+            }
+            @Override
+            protected void onPreExecute() {
+            }
+            @Override
+            protected void onProgressUpdate(String... progress) {
+            }
+            @Override
+            protected void onPostExecute(Face[] result) {
+                if(result == null || result.length == 0) {
+                    Toast.makeText(getApplicationContext(), "Face was not detected, please try again", Toast.LENGTH_LONG).show();
+                    compareImageFile.delete();
+                    return;
+                }else{
+                    // Face was detected, allow this
+                    Toast.makeText(getApplicationContext(), "Face was detected, proceeding to verify", Toast.LENGTH_SHORT).show();
+                    verifyImageFaceAPI(getPreferences(Context.MODE_PRIVATE).getString(FileManager.BASE_IMG_REF, null), result[0].faceId.toString());
+                }
+
+            }
+        };
+
+        detectTask.execute(inputStream);
+    }
+
+    @SuppressLint("StaticFieldLeak")
+    private void verifyImageFaceAPI(final String faceIdBase, final String faceIdCompare){
+        if(faceIdBase == null|| faceIdCompare == null) return;
+
+        AsyncTask<String, String, VerifyResult> detectTask;
+        detectTask = new AsyncTask<String, String, VerifyResult>() {
+            @Override
+            protected VerifyResult doInBackground(String... params) {
+                try {
+
+                    VerifyResult verifyResult = faceServiceClient.verify(UUID.fromString(faceIdBase), UUID.fromString(faceIdCompare));
+
+                    if (verifyResult == null)
+                    {
+                        Log.v("doInBackground", "Verification resulted in null");
+                        return null;
+                    }
+
+                    return verifyResult;
+
+                } catch (Exception e) {
+                    Log.v("doInBackground", "Exception: " + e.getMessage());
+
+                    return null;
+                }
+            }
+            @Override
+            protected void onPreExecute() {
+            }
+            @Override
+            protected void onProgressUpdate(String... progress) {
+            }
+            @Override
+            protected void onPostExecute(VerifyResult result) {
+                if(result == null || result.confidence < .7500) {
+                    Toast.makeText(getApplicationContext(), "Cannot verify, confidence is too low. Please try again.", Toast.LENGTH_LONG).show();
+                    compareImageFile.delete();
+                    return;
+                }else{
+                    // Face was detected, allow this
+                    Toast.makeText(getApplicationContext(), "Face verified. Confidence of: " + result.confidence, Toast.LENGTH_LONG).show();
+                }
+
+            }
+        };
+
+        detectTask.execute("");
+
     }
 
     private void verifyImages(){
@@ -178,7 +297,7 @@ public class MainActivity extends AppCompatActivity {
                 FileProvider.getUriForFile(
                         this,
                         "app.izhang.faciallogin.fileprovider",
-                        savedImageFile)
+                        compareImageFile)
         );
 
         // Checks to see if the phone has a camera app/hardware
@@ -244,7 +363,18 @@ public class MainActivity extends AppCompatActivity {
             }
             Toast.makeText(getApplicationContext(), "Successfully saved image", Toast.LENGTH_LONG).show();
         }else if(requestCode == CAMERA_PHOTO_VERIFY_REQUEST && resultCode == RESULT_OK){
-            Toast.makeText(getApplicationContext(), "Successfully verified image ", Toast.LENGTH_LONG).show();
+            if(compareImageFile.exists()){
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                Bitmap bitmap = null;
+                try {
+                    bitmap = handleSamplingAndRotationBitmap(this, Uri.fromFile(compareImageFile.getAbsoluteFile()));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                detectAndVerifyImage(bitmap);
+            }
         }
     }
 
