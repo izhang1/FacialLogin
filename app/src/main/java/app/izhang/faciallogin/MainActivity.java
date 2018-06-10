@@ -41,6 +41,9 @@ import java.net.URI;
 import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
+    // TODO: Replace this with your own keys from https://azure.microsoft.com/en-us/services/cognitive-services/face/
+    private static String API_KEY = "";
+    private static String SERVICE_HOST = "";
 
     private static int CAMERA_PHOTO_REGISTER_REQUEST = 1111;
     private static int CAMERA_PHOTO_LOGIN_REQUEST = 1001;
@@ -54,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
     private File savedImageFile;
     private File compareImageFile;
 
-    private FaceServiceClient faceServiceClient = new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "30aaa6ed3f904c2b9c6df2a541d3ce3e");
+    private FaceServiceClient faceServiceClient = new FaceServiceRestClient(SERVICE_HOST, API_KEY);
 
 
     @Override
